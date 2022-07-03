@@ -1,0 +1,6 @@
+docker build -t grip .
+docker run -d --rm --name grip -p 8080:80 grip
+cp docker.nginx.service /etc/systemd/system/
+systemctl start docker.nginx
+curl http://127.0.0.1:8080/basic_status
+systemctl stop docker.nginx

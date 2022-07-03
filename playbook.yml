@@ -1,0 +1,122 @@
+---
+- name: Installing Docker
+  hosts: localpc
+  become: true
+  tasks:
+    - name: Install dependencies
+      apt:
+        name: "{{item}}"
+        state: present
+        update_cache: yes
+      loop:
+        - ca-certificates
+        - curl
+        - gnupg
+        - lsb-release
+        - software-properties-common
+
+    - name: GPG
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: repository docker
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu bionic stable
+        state: present
+
+    - name: Install Docker
+      apt:
+        name: "{{item}}"
+        state: latest
+        update_cache: yes
+      loop:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
+        - docker-compose-plugin
+    
+    - name: Start Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+- name: Installing conterized Nginx
+  hosts: localpc
+  become: true
+  
+  vars:
+    dir: grip
+    config_files:
+      - Dockerfile
+      - stub-status.conf
+    cont_image: grip
+    service_name: docker.nginx
+  vars_prompt:
+    - name: run_as_service
+      private: false
+      prompt: "Startn Nginx as a systemd service? (true/false)"
+    
+
+  tasks:
+    - name: Copying config files to node
+      copy:
+        src: ./{{item}}
+        dest: ./{{dir}}/
+      loop: '{{config_files}}'
+
+    - name: Build Docker image
+      command: "docker build -t {{cont_image}} ./{{dir}}/"
+
+    - name: Install Python3
+      apt:
+        name: python3
+        state: present
+
+    - name: Install pip for Python
+      apt:
+        name: python3-pip
+        state: present
+
+    - name: Install docker module for Python
+      command: "pip install docker"
+
+    - name: Run Niginx container
+      docker_container:
+        name: "{{cont_image}}"
+        image: "{{cont_image}}"
+        ports:
+          - "8080:80"
+        cleanup: yes
+        state: started
+        restart: yes
+      when: not run_as_service | bool
+
+    - name: Create Docker Nginx service
+      copy:
+        src: ./{{service_name}}.service
+        dest: /etc/systemd/system/
+    
+    - name: Start Docker Nginx service
+      service:
+        name: "{{service_name}}"
+        state: restarted
+      when: run_as_service | bool
+
+- name: Test Nginx server
+  hosts: localpc
+
+  tasks:
+    - name: Wait until Nginx starts
+      pause:
+        seconds: 3
+
+    - name: Run curl command
+      command: curl http://127.0.0.1:8080/basic_status
+      register: response
+
+    - debug:
+        var: response
+
+        

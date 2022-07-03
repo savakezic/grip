@@ -1,0 +1,14 @@
+[Unit]
+Description=Ngnix Container
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+Restart=always
+ExecStartPre=-/usr/bin/docker stop grip
+ExecStartPre=-/usr/bin/docker rm grip
+ExecStart=/usr/bin/docker run --rm --name grip -p 8080:80 grip
+
+[Install]
+WantedBy=multi-user.target

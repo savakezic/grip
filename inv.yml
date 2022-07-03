@@ -1,0 +1,6 @@
+---
+all:
+  hosts:
+    localpc:
+      ansible_connection: local
+      name: localhost
